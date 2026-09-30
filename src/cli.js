@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { resolve } from "node:path";
 import { obfuscate } from "./obfuscator.js";
 
 function usage() {
@@ -24,9 +24,10 @@ for (let i = 0; i < args.length; i++) {
 }
 if (!input) { console.error("Provide an input JavaScript file."); usage(); process.exit(2); }
 try {
-  const source = readFileSync(resolve(input), "utf8");
+  const inputPath = resolve(input);
+  const source = readFileSync(inputPath, "utf8");
   const result = obfuscate(source, options);
-  const destination = output ? resolve(output) : resolve(basename(input, ".js") + ".obfuscated.js");
+  const destination = output ? resolve(output) : inputPath.replace(/\.js$/i, "") + ".obfuscated.js";
   writeFileSync(destination, result.code, "utf8");
   console.log("Wrote " + destination + " (" + result.stats.inputBytes + " -> " + result.stats.outputBytes + " bytes)");
 } catch (error) {
