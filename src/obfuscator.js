@@ -10,7 +10,9 @@ const DEFAULTS = Object.freeze({
   renameVariables: true,
   stringArray: true,
   numbersToExpressions: true,
-  simplifyBranches: true
+  simplifyBranches: true,
+  controlFlowFlattening: false,
+  antiTamper: false
 });
 
 function randomSource(seed) {
@@ -105,7 +107,7 @@ function isDirective(parent, node) {
     typeof parent.directive === "string";
 }
 
-function encodeStrings(ast, next, used) {
+function encodeStrings(ast, next, used, antiTamper = false) {
   const strings = [];
   const indexes = new Map();
   estraverse.traverse(ast, {
@@ -129,17 +131,32 @@ function encodeStrings(ast, next, used) {
   const slots = new Map(order.map((original, slot) => [original, slot]));
   const tableName = freshIdentifier(used, next);
   const cacheName = freshIdentifier(used, next);
+  const checkName = antiTamper ? freshIdentifier(used, next) : null;
   const decodeName = freshIdentifier(used, next);
   const key = 1 + next(255);
+  const checksums = order.map(originalIndex => {
+    const value = strings[originalIndex];
+    let first = 2166136261 >>> 0;
+    let second = 2654435769 >>> 0;
+    for (let i = 0; i < value.length; i++) {
+      const unit = value.charCodeAt(i) ^ key;
+      first = Math.imul(first ^ unit, 16777619) >>> 0;
+      second = (Math.imul(second ^ (unit + i), 2246822519) + 3266489917) >>> 0;
+    }
+    return [first, second];
+  });
   const encoded = order.map(originalIndex => {
     const value = strings[originalIndex];
     const units = [];
     for (let i = 0; i < value.length; i++) units.push(value.charCodeAt(i) ^ key);
     return { type: "ArrayExpression", elements: units.map(value => ({ type: "Literal", value })) };
   });
+  const integrityCode = antiTamper
+    ? "var h=2166136261,q=2654435769;for(var k=0;k<a.length;k++){h=Math.imul(h^a[k],16777619)>>>0;q=(Math.imul(q^(a[k]+k),2246822519)+3266489917)>>>0}if((h>>>0)!==" + checkName + "[i][0]||(q>>>0)!==" + checkName + "[i][1])throw new Error('String table integrity check failed');"
+    : "";
 
   const decoder = parse(
-    "function " + decodeName + "(i){var c=" + cacheName + "[i];if(c!==void 0)return c;var a=" + tableName + "[i],s=\"\";for(var j=0;j<a.length;j++)s+=String.fromCharCode(a[j]^" + key + ");" + cacheName + "[i]=s;return s}"
+    "function " + decodeName + "(i){var c=" + cacheName + "[i];if(c!==void 0)return c;var a=" + tableName + "[i],s=\"\";" + integrityCode + "for(var j=0;j<a.length;j++)s+=String.fromCharCode(a[j]^" + key + ");" + cacheName + "[i]=s;return s}"
   ).body[0];
   estraverse.replace(ast, {
     leave(node, parent) {
@@ -168,7 +185,94 @@ function encodeStrings(ast, next, used) {
     declarations: [{ type: "VariableDeclarator", id: { type: "Identifier", name: cacheName },
       init: { type: "ArrayExpression", elements: [] } }]
   };
-  return [table, cache, decoder];
+  const runtime = [table, cache];
+  if (antiTamper) {
+    runtime.push({
+      type: "VariableDeclaration",
+      kind: "var",
+      declarations: [{ type: "VariableDeclarator", id: { type: "Identifier", name: checkName },
+        init: { type: "ArrayExpression", elements: checksums.map(pair => ({
+          type: "ArrayExpression", elements: pair.map(value => ({ type: "Literal", value }))
+        })) } }]
+    });
+  }
+  runtime.push(decoder);
+  return runtime;
+}
+
+function flattenSimpleFunctions(ast, next) {
+  const used = new Set();
+  estraverse.traverse(ast, { enter(node) { if (node.type === "Identifier") used.add(node.name); } });
+  let flattened = 0;
+
+  estraverse.traverse(ast, {
+    enter(node) {
+      if (!["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"].includes(node.type) ||
+          !node.body || node.body.type !== "BlockStatement") return;
+      const body = node.body.body;
+      let directiveCount = 0;
+      while (directiveCount < body.length && typeof body[directiveCount].directive === "string") directiveCount++;
+      const statements = body.slice(directiveCount);
+      if (statements.length < 4) return;
+      for (let i = 0; i < statements.length; i++) {
+        const statement = statements[i];
+        const supported = (statement.type === "VariableDeclaration" && statement.kind === "var") ||
+          statement.type === "ExpressionStatement" || statement.type === "ReturnStatement" ||
+          statement.type === "ThrowStatement";
+        if (!supported || ((statement.type === "ReturnStatement" || statement.type === "ThrowStatement") &&
+            i !== statements.length - 1)) return;
+      }
+
+      const stateName = freshIdentifier(used, next);
+      const labelSet = new Set();
+      const labels = statements.map(() => {
+        let label;
+        do { label = 1 + next(0x7ffffffe); } while (labelSet.has(label));
+        labelSet.add(label);
+        return label;
+      });
+      const order = statements.map((_, index) => index);
+      for (let i = order.length - 1; i > 0; i--) {
+        const j = next(i + 1);
+        [order[i], order[j]] = [order[j], order[i]];
+      }
+      const state = () => ({ type: "Identifier", name: stateName });
+      const literal = value => ({ type: "Literal", value });
+      const cases = order.map(index => {
+        const statement = statements[index];
+        const consequent = [statement];
+        if (statement.type !== "ReturnStatement" && statement.type !== "ThrowStatement") {
+          consequent.push({
+            type: "ExpressionStatement",
+            expression: { type: "AssignmentExpression", operator: "=", left: state(),
+              right: literal(index + 1 < statements.length ? labels[index + 1] : -1) }
+          });
+          consequent.push({ type: "BreakStatement", label: null });
+        }
+        return { type: "SwitchCase", test: literal(labels[index]), consequent };
+      });
+      cases.push({
+        type: "SwitchCase",
+        test: null,
+        consequent: [{ type: "ExpressionStatement",
+          expression: { type: "AssignmentExpression", operator: "=", left: state(), right: literal(-1) } }]
+      });
+      const controlLoop = {
+        type: "WhileStatement",
+        test: { type: "BinaryExpression", operator: "!==", left: state(), right: literal(-1) },
+        body: { type: "BlockStatement", body: [{
+          type: "SwitchStatement", discriminant: state(), cases
+        }] }
+      };
+      body.splice(directiveCount, body.length - directiveCount,
+        { type: "VariableDeclaration", kind: "var", declarations: [{
+          type: "VariableDeclarator", id: state(), init: literal(labels[0])
+        }] },
+        controlLoop);
+      flattened++;
+    }
+  });
+  return flattened;
 }
 
 function transformNumbers(ast, next) {
@@ -219,13 +323,14 @@ export function obfuscate(source, options = {}) {
   const settings = { ...DEFAULTS, ...options };
   const next = randomSource(settings.seed);
   const ast = parse(source);
+  const flattenedFunctions = settings.controlFlowFlattening ? flattenSimpleFunctions(ast, next) : 0;
   const dynamicScope = hasDynamicScope(ast);
   if (settings.renameVariables && !dynamicScope) renameBindings(ast, next);
 
   const used = new Set();
   estraverse.traverse(ast, { enter(node) { if (node.type === "Identifier") used.add(node.name); } });
   let runtime = null;
-  if (settings.stringArray) runtime = encodeStrings(ast, next, used);
+  if (settings.stringArray) runtime = encodeStrings(ast, next, used, settings.antiTamper);
   if (settings.numbersToExpressions) transformNumbers(ast, next);
   if (settings.simplifyBranches) mutateBranches(ast);
   insertAfterDirectivesAndImports(ast, runtime);
@@ -245,7 +350,9 @@ export function obfuscate(source, options = {}) {
   return { code: output, stats: {
     inputBytes: new TextEncoder().encode(source).length,
     outputBytes: new TextEncoder().encode(output).length,
-    dynamicScopeSkippedRenaming: dynamicScope
+    dynamicScopeSkippedRenaming: dynamicScope,
+    flattenedFunctions,
+    antiTamperActive: Boolean(settings.antiTamper && runtime)
   } };
 }
 

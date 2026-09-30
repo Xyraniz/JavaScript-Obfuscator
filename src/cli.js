@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { obfuscate } from "./obfuscator.js";
 
 function usage() {
-  console.log("Usage: js-obfuscator <input.js> [-o output.js] [--seed n] [--no-mangle] [--no-strings] [--no-numbers] [--no-branches] [--pretty]");
+  console.log("Usage: js-obfuscator <input.js> [-o output.js] [--seed n] [--no-mangle] [--no-strings] [--no-numbers] [--no-branches] [--control-flow] [--anti-tamper] [--pretty]");
   console.log("       js-obfuscator verify   Obfuscate and compare every logic fixture");
 }
 const args = process.argv.slice(2);
@@ -29,6 +29,8 @@ for (let i = 0; i < args.length; i++) {
   else if (arg === "--no-strings") options.stringArray = false;
   else if (arg === "--no-numbers") options.numbersToExpressions = false;
   else if (arg === "--no-branches") options.simplifyBranches = false;
+  else if (arg === "--control-flow") options.controlFlowFlattening = true;
+  else if (arg === "--anti-tamper") options.antiTamper = true;
   else if (arg === "--pretty") options.compact = false;
   else if (!arg.startsWith("-") && input === null) input = arg;
   else { console.error("Unknown or incomplete option: " + arg); usage(); process.exit(2); }

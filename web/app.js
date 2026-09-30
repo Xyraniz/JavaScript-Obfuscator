@@ -18,7 +18,9 @@ function options() {
     renameVariables: $("rename").checked,
     stringArray: $("strings").checked,
     numbersToExpressions: $("numbers").checked,
-    simplifyBranches: $("branches").checked
+    simplifyBranches: $("branches").checked,
+    controlFlowFlattening: $("control-flow").checked,
+    antiTamper: $("anti-tamper").checked
   };
 }
 
@@ -39,7 +41,9 @@ run.addEventListener("click", () => {
     $("output-count").textContent = latest.length.toLocaleString("es-ES") + " caracteres";
     $("size-result").textContent = result.stats.inputBytes.toLocaleString("es-ES") + " → " +
       result.stats.outputBytes.toLocaleString("es-ES") + " bytes" +
-      (result.stats.dynamicScopeSkippedRenaming ? " · renombrado omitido por eval/with" : "");
+      (result.stats.dynamicScopeSkippedRenaming ? " · renombrado omitido por eval/with" : "") +
+      (result.stats.flattenedFunctions ? " · " + result.stats.flattenedFunctions + " funciones aplanadas" : "") +
+      (result.stats.antiTamperActive ? " · integridad activa" : "");
     copy.disabled = false;
     download.disabled = false;
     status.textContent = "Listo. Puedes revisar, copiar o descargar el resultado.";
