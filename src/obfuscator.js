@@ -80,8 +80,13 @@ function renameBindings(ast, next) {
       if (!variable.defs.length || variable.name === "arguments" || variable.name === "eval") continue;
       const replacement = freshIdentifier(used, next);
       const rename = identifier => {
-        const parent = parents.get(identifier);
-        if (parent && parent.type === "Property" && parent.shorthand && parent.value === identifier) {
+        let child = identifier;
+        let parent = parents.get(child);
+        if (parent && parent.type === "AssignmentPattern" && parent.left === child) {
+          child = parent;
+          parent = parents.get(child);
+        }
+        if (parent && parent.type === "Property" && parent.shorthand && parent.value === child) {
           parent.shorthand = false;
           if (parent.key === identifier) parent.key = { type: "Identifier", name: variable.name };
         }
@@ -123,6 +128,7 @@ function encodeStrings(ast, next, used) {
   }
   const slots = new Map(order.map((original, slot) => [original, slot]));
   const tableName = freshIdentifier(used, next);
+  const cacheName = freshIdentifier(used, next);
   const decodeName = freshIdentifier(used, next);
   const key = 1 + next(255);
   const encoded = order.map(originalIndex => {
@@ -133,7 +139,7 @@ function encodeStrings(ast, next, used) {
   });
 
   const decoder = parse(
-    "function " + decodeName + "(i){var a=" + tableName + "[i],s=\"\";for(var j=0;j<a.length;j++)s+=String.fromCharCode(a[j]^" + key + ");return s}"
+    "function " + decodeName + "(i){var c=" + cacheName + "[i];if(c!==void 0)return c;var a=" + tableName + "[i],s=\"\";for(var j=0;j<a.length;j++)s+=String.fromCharCode(a[j]^" + key + ");" + cacheName + "[i]=s;return s}"
   ).body[0];
   estraverse.replace(ast, {
     leave(node, parent) {
@@ -156,7 +162,13 @@ function encodeStrings(ast, next, used) {
     declarations: [{ type: "VariableDeclarator", id: { type: "Identifier", name: tableName },
       init: { type: "ArrayExpression", elements: encoded } }]
   };
-  return [table, decoder];
+  const cache = {
+    type: "VariableDeclaration",
+    kind: "var",
+    declarations: [{ type: "VariableDeclarator", id: { type: "Identifier", name: cacheName },
+      init: { type: "ArrayExpression", elements: [] } }]
+  };
+  return [table, cache, decoder];
 }
 
 function transformNumbers(ast, next) {

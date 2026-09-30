@@ -5,8 +5,19 @@ import { obfuscate } from "./obfuscator.js";
 
 function usage() {
   console.log("Usage: js-obfuscator <input.js> [-o output.js] [--seed n] [--no-mangle] [--no-strings] [--no-numbers] [--no-branches] [--pretty]");
+  console.log("       js-obfuscator verify   Obfuscate and compare every logic fixture");
 }
 const args = process.argv.slice(2);
+if (args[0] === "verify") {
+  try {
+    const { verifyAll } = await import("../tests/verify.js");
+    verifyAll();
+  } catch (error) {
+    console.error("Verification failed: " + error.message);
+    process.exit(1);
+  }
+  process.exit(0);
+}
 if (!args.length || args.includes("--help") || args.includes("-h")) { usage(); process.exit(args.length ? 0 : 1); }
 let input = null, output = null;
 const options = {};
