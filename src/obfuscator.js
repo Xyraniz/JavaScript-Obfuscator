@@ -1,5 +1,5 @@
 import * as acorn from "acorn";
-import eslintScope from "eslint-scope";
+import * as eslintScope from "eslint-scope";
 import estraverse from "estraverse";
 import escodegen from "escodegen";
 
