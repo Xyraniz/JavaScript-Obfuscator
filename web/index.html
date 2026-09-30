@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10131b">
+  <title>JavaScript Obfuscator — Xyraniz</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "acorn": "https://esm.sh/acorn@8.14.1",
+      "eslint-scope": "https://esm.sh/eslint-scope@8.2.0",
+      "estraverse": "https://esm.sh/estraverse@5.3.0",
+      "escodegen": "https://esm.sh/escodegen@2.1.0"
+    }
+  }
+  </script>
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Xyraniz JavaScript Obfuscator">
+      <span class="brand-mark">X</span><span>Xyraniz <b>Obfuscator</b></span>
+    </a>
+    <span class="local-badge"><i></i> Procesamiento local</span>
+  </header>
+  <main class="shell">
+    <section class="intro">
+      <div class="eyebrow">JAVASCRIPT · PROTECCIÓN DE CÓDIGO</div>
+      <h1>Haz que tu código<br><span>cueste más de leer.</span></h1>
+      <p>Transformaciones de sintaxis con salida lista para descargar. Tu código se procesa en esta pestaña.</p>
+    </section>
+
+    <section class="workspace" aria-label="Obfuscador">
+      <div class="workspace-head">
+        <div><strong>Configuración</strong><span class="subtle">Controla cada transformación</span></div>
+        <label class="seed-field">Semilla <input id="seed" type="number" min="0" value="424242"></label>
+      </div>
+      <div class="toggles">
+        <label class="toggle"><input id="rename" type="checkbox" checked><span class="switch"></span><span><b>Renombrar variables</b><small>Nombres locales compactos</small></span></label>
+        <label class="toggle"><input id="strings" type="checkbox" checked><span class="switch"></span><span><b>Codificar cadenas</b><small>Tabla con decodificador inline</small></span></label>
+        <label class="toggle"><input id="numbers" type="checkbox" checked><span class="switch"></span><span><b>Transformar números</b><small>Expresiones aritméticas equivalentes</small></span></label>
+        <label class="toggle"><input id="branches" type="checkbox" checked><span class="switch"></span><span><b>Camuflar condiciones</b><small>Normalización de ramas y bucles</small></span></label>
+        <label class="toggle"><input id="compact" type="checkbox" checked><span class="switch"></span><span><b>Salida compacta</b><small>Quitar espacios y comentarios</small></span></label>
+      </div>
+
+      <div class="editors">
+        <label class="editor-card">
+          <span class="editor-label"><b>CÓDIGO DE ENTRADA</b><span id="input-count">0 caracteres</span></span>
+          <textarea id="source" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Pega aquí tu JavaScript…"></textarea>
+        </label>
+        <label class="editor-card output-card">
+          <span class="editor-label"><b>CÓDIGO OBFUSCADO</b><span id="output-count">—</span></span>
+          <textarea id="output" spellcheck="false" readonly placeholder="El resultado aparecerá aquí"></textarea>
+        </label>
+      </div>
+
+      <div id="error" class="error" role="alert" hidden></div>
+      <div class="actions">
+        <span id="status" class="status">El código nunca sale de tu navegador.</span>
+        <div class="buttons">
+          <button id="clear" class="button secondary" type="button">Limpiar</button>
+          <button id="run" class="button primary" type="button"><span>Obfuscar</span><span aria-hidden="true">→</span></button>
+        </div>
+      </div>
+      <div class="result-actions">
+        <span id="size-result"></span>
+        <div class="buttons">
+          <button id="copy" class="button secondary small" type="button" disabled>Copiar</button>
+          <button id="download" class="button secondary small" type="button" disabled>Descargar .js</button>
+        </div>
+      </div>
+    </section>
+    <footer><span>JavaScript Obfuscator</span><span>Las transformaciones no sustituyen una política segura de gestión de secretos.</span></footer>
+  </main>
+</body>
+</html>

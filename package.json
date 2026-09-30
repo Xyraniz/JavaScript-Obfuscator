@@ -1,0 +1,18 @@
+{
+  "name": "xyraniz-js-obfuscator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "js-obfuscator": "./src/cli.js"
+  },
+  "scripts": {
+    "obfuscate": "node src/cli.js"
+  },
+  "dependencies": {
+    "acorn": "^8.14.1",
+    "escodegen": "^2.1.0",
+    "eslint-scope": "^8.2.0",
+    "estraverse": "^5.3.0"
+  }
+}
