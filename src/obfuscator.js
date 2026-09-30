@@ -237,7 +237,10 @@ function flattenSimpleFunctions(ast, next) {
         [order[i], order[j]] = [order[j], order[i]];
       }
       const state = () => ({ type: "Identifier", name: stateName });
-      const literal = value => ({ type: "Literal", value });
+      const literal = value => value < 0
+        ? { type: "UnaryExpression", operator: "-", prefix: true,
+          argument: { type: "Literal", value: -value } }
+        : { type: "Literal", value };
       const cases = order.map(index => {
         const statement = statements[index];
         const consequent = [statement];
