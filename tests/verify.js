@@ -13,7 +13,9 @@ const options = {
   numbersToExpressions: true,
   simplifyBranches: true,
   controlFlowFlattening: true,
-  antiTamper: true
+  antiTamper: true,
+  opaquePredicates: true,
+  deadCodeInjection: true
 };
 
 function execute(source, filename) {
@@ -48,11 +50,19 @@ export function verifyAll() {
     const second = obfuscate(source, options);
     assert.equal(first.code, second.code, name + ": seeded output must be reproducible.");
     assert.equal(first.stats.antiTamperActive, true, name + ": string integrity should be enabled.");
+    assert.ok(first.stats.deadCodeBlocks >= 1, name + ": a dead-code guard block should always be injected.");
+    assert.doesNotMatch(first.code, /\bnew\s+Function\s*\(/, name + ": output must never contain new Function().");
+    if (name !== "dynamic-eval.js") {
+      assert.doesNotMatch(first.code, /\beval\s*\(/, name + ": the obfuscator must never introduce eval().");
+    }
     if (name === "dynamic-eval.js") {
       assert.equal(first.stats.dynamicScopeSkippedRenaming, true, "eval must disable local renaming.");
     }
     if (name === "control-flow-flattening.js") {
       assert.ok(first.stats.flattenedFunctions > 0, "a straight-line function should be flattened.");
+    }
+    if (name === "control-numbers.js") {
+      assert.ok(first.stats.guardedBranches > 0, "a branch-heavy fixture should receive opaque predicate guards.");
     }
     assert.equal(
       execute(first.code, name + ".obfuscated.js"),
