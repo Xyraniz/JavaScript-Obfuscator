@@ -13,7 +13,9 @@ const DEFAULTS = Object.freeze({
   simplifyBranches: true,
   controlFlowFlattening: false,
   antiTamper: false,
-  obfuscateProperties: false
+  obfuscateProperties: false,
+  opaquePredicates: true,
+  deadCodeInjection: false
 });
 
 function randomSource(seed) {
@@ -322,6 +324,66 @@ function mutateBranches(ast) {
   });
 }
 
+function guardBranchTests(ast, opaqueCall) {
+  let guarded = 0;
+  estraverse.traverse(ast, {
+    enter(node) {
+      if (node.type !== "IfStatement" && node.type !== "ConditionalExpression") return;
+      node.test = { type: "LogicalExpression", operator: "&&", left: opaqueCall(true), right: node.test };
+      guarded++;
+    }
+  });
+  return guarded;
+}
+
+function buildDeadStatements(next, used) {
+  const count = 2 + next(3);
+  const statements = [];
+  let previous = null;
+  for (let i = 0; i < count; i++) {
+    const name = freshIdentifier(used, next);
+    const base = 100 + next(900000);
+    const operator = ["+", "-", "*", "^"][next(4)];
+    const init = previous
+      ? { type: "BinaryExpression", operator, left: { type: "Identifier", name: previous },
+        right: { type: "Literal", value: base } }
+      : { type: "Literal", value: base };
+    statements.push({
+      type: "VariableDeclaration",
+      kind: "let",
+      declarations: [{ type: "VariableDeclarator", id: { type: "Identifier", name }, init }]
+    });
+    previous = name;
+  }
+  return statements;
+}
+
+function buildDeadBlock(next, used, opaqueCall) {
+  return {
+    type: "IfStatement",
+    test: opaqueCall(false),
+    consequent: { type: "BlockStatement", body: buildDeadStatements(next, used) },
+    alternate: null
+  };
+}
+
+function insertDeadCode(ast, next, used, opaqueCall) {
+  let injected = 1;
+  insertAfterDirectivesAndImports(ast, [buildDeadBlock(next, used, opaqueCall)]);
+  estraverse.traverse(ast, {
+    enter(node) {
+      if (!["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"].includes(node.type)) return;
+      if (!node.body || node.body.type !== "BlockStatement") return;
+      if (next(2) === 0) return;
+      let index = 0;
+      while (index < node.body.body.length && typeof node.body.body[index].directive === "string") index++;
+      node.body.body.splice(index, 0, buildDeadBlock(next, used, opaqueCall));
+      injected++;
+    }
+  });
+  return injected;
+}
+
 function insertAfterDirectivesAndImports(ast, statements) {
   if (!statements || !statements.length) return;
   let index = 0;
@@ -347,10 +409,34 @@ export function obfuscate(source, options = {}) {
 
   const used = new Set();
   estraverse.traverse(ast, { enter(node) { if (node.type === "Identifier") used.add(node.name); } });
-  let runtime = null;
-  if (settings.stringArray) runtime = encodeStrings(ast, next, used, settings.antiTamper);
+
+  let opaqueHelperName = null;
+  let opaqueHelperNode = null;
+  function opaqueCall(mode) {
+    if (!opaqueHelperName) {
+      opaqueHelperName = freshIdentifier(used, next);
+      opaqueHelperNode = parse(
+        "function " + opaqueHelperName + "(m){var t=Date.now()%2;return m?(t===0||t===1):(t===2)}"
+      ).body[0];
+    }
+    return {
+      type: "CallExpression",
+      callee: { type: "Identifier", name: opaqueHelperName },
+      arguments: [{ type: "Literal", value: mode }],
+      optional: false
+    };
+  }
+
+  const guardedBranches = settings.opaquePredicates ? guardBranchTests(ast, opaqueCall) : 0;
+  const deadCodeBlocks = settings.deadCodeInjection ? insertDeadCode(ast, next, used, opaqueCall) : 0;
+
+  let stringRuntime = null;
+  if (settings.stringArray) stringRuntime = encodeStrings(ast, next, used, settings.antiTamper);
   if (settings.numbersToExpressions) transformNumbers(ast, next);
   if (settings.simplifyBranches) mutateBranches(ast);
+  const runtime = opaqueHelperNode
+    ? (stringRuntime ? [opaqueHelperNode, ...stringRuntime] : [opaqueHelperNode])
+    : stringRuntime;
   insertAfterDirectivesAndImports(ast, runtime);
 
   const output = escodegen.generate(ast, {
@@ -370,8 +456,10 @@ export function obfuscate(source, options = {}) {
     outputBytes: new TextEncoder().encode(output).length,
     dynamicScopeSkippedRenaming: dynamicScope,
     flattenedFunctions,
-    antiTamperActive: Boolean(settings.antiTamper && runtime),
-    obfuscatedProperties
+    antiTamperActive: Boolean(settings.antiTamper && stringRuntime),
+    obfuscatedProperties,
+    guardedBranches,
+    deadCodeBlocks
   } };
 }
 
