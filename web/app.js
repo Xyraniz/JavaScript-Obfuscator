@@ -21,7 +21,9 @@ function options() {
     simplifyBranches: $("branches").checked,
     controlFlowFlattening: $("control-flow").checked,
     antiTamper: $("anti-tamper").checked,
-    obfuscateProperties: $("properties").checked
+    obfuscateProperties: $("properties").checked,
+    opaquePredicates: $("opaque").checked,
+    deadCodeInjection: $("dead-code").checked
   };
 }
 
@@ -45,6 +47,8 @@ run.addEventListener("click", () => {
       (result.stats.dynamicScopeSkippedRenaming ? " · renombrado omitido por eval/with" : "") +
       (result.stats.flattenedFunctions ? " · " + result.stats.flattenedFunctions + " funciones aplanadas" : "") +
       (result.stats.obfuscatedProperties ? " · " + result.stats.obfuscatedProperties + " propiedades cifradas" : "") +
+      (result.stats.guardedBranches ? " · " + result.stats.guardedBranches + " ramas con predicado opaco" : "") +
+      (result.stats.deadCodeBlocks ? " · " + result.stats.deadCodeBlocks + " bloques señuelo" : "") +
       (result.stats.antiTamperActive ? " · integridad activa" : "");
     copy.disabled = false;
     download.disabled = false;
