@@ -20,7 +20,8 @@ function options() {
     numbersToExpressions: $("numbers").checked,
     simplifyBranches: $("branches").checked,
     controlFlowFlattening: $("control-flow").checked,
-    antiTamper: $("anti-tamper").checked
+    antiTamper: $("anti-tamper").checked,
+    obfuscateProperties: $("properties").checked
   };
 }
 
@@ -43,6 +44,7 @@ run.addEventListener("click", () => {
       result.stats.outputBytes.toLocaleString("es-ES") + " bytes" +
       (result.stats.dynamicScopeSkippedRenaming ? " · renombrado omitido por eval/with" : "") +
       (result.stats.flattenedFunctions ? " · " + result.stats.flattenedFunctions + " funciones aplanadas" : "") +
+      (result.stats.obfuscatedProperties ? " · " + result.stats.obfuscatedProperties + " propiedades cifradas" : "") +
       (result.stats.antiTamperActive ? " · integridad activa" : "");
     copy.disabled = false;
     download.disabled = false;
