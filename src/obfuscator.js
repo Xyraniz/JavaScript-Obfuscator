@@ -12,7 +12,8 @@ const DEFAULTS = Object.freeze({
   numbersToExpressions: true,
   simplifyBranches: true,
   controlFlowFlattening: false,
-  antiTamper: false
+  antiTamper: false,
+  obfuscateProperties: false
 });
 
 function randomSource(seed) {
@@ -99,6 +100,19 @@ function renameBindings(ast, next) {
       changed++;
     }
   }
+  return changed;
+}
+
+function obfuscateMemberAccess(ast) {
+  let changed = 0;
+  estraverse.traverse(ast, {
+    enter(node) {
+      if (node.type !== "MemberExpression" || node.computed || node.property.type !== "Identifier") return;
+      node.computed = true;
+      node.property = { type: "Literal", value: node.property.name };
+      changed++;
+    }
+  });
   return changed;
 }
 
@@ -329,6 +343,7 @@ export function obfuscate(source, options = {}) {
   const flattenedFunctions = settings.controlFlowFlattening ? flattenSimpleFunctions(ast, next) : 0;
   const dynamicScope = hasDynamicScope(ast);
   if (settings.renameVariables && !dynamicScope) renameBindings(ast, next);
+  const obfuscatedProperties = settings.obfuscateProperties ? obfuscateMemberAccess(ast) : 0;
 
   const used = new Set();
   estraverse.traverse(ast, { enter(node) { if (node.type === "Identifier") used.add(node.name); } });
@@ -355,7 +370,8 @@ export function obfuscate(source, options = {}) {
     outputBytes: new TextEncoder().encode(output).length,
     dynamicScopeSkippedRenaming: dynamicScope,
     flattenedFunctions,
-    antiTamperActive: Boolean(settings.antiTamper && runtime)
+    antiTamperActive: Boolean(settings.antiTamper && runtime),
+    obfuscatedProperties
   } };
 }
 
