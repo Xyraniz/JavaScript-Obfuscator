@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#10131b">
-  <title>JavaScript Obfuscator — Xyraniz</title>
+  <meta name="theme-color" content="#0a0a0a">
+  <title>JavaScript Obfuscator</title>
   <link rel="stylesheet" href="./style.css">
   <script type="importmap">
   {
@@ -20,10 +20,9 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="#" aria-label="Xyraniz JavaScript Obfuscator">
-      <span class="brand-mark">X</span><span>Xyraniz <b>Obfuscator</b></span>
+    <a class="brand" href="#" aria-label="JavaScript Obfuscator">
+      <span class="brand-mark">{ }</span><span>JavaScript <b>Obfuscator</b></span>
     </a>
-    <span class="local-badge"><i></i> Procesamiento local</span>
   </header>
   <main class="shell">
     <section class="intro">
@@ -45,6 +44,7 @@
         <label class="toggle"><input id="compact" type="checkbox" checked><span class="switch"></span><span><b>Salida compacta</b><small>Quitar espacios y comentarios</small></span></label>
         <label class="toggle"><input id="control-flow" type="checkbox"><span class="switch"></span><span><b>Aplanar flujo</b><small>Dispatcher en funciones lineales seguras</small></span></label>
         <label class="toggle"><input id="anti-tamper" type="checkbox"><span class="switch"></span><span><b>Integridad de cadenas</b><small>Detectar cambios en la tabla codificada</small></span></label>
+        <label class="toggle"><input id="properties" type="checkbox"><span class="switch"></span><span><b>Ofuscar propiedades</b><small>obj.prop pasa a notación cifrada</small></span></label>
       </div>
 
       <div class="editors">
